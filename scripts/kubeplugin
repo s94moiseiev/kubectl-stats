@@ -1,11 +1,35 @@
 #!/bin/bash
 
-# Define command-line arguments
+#User gid
+if [ "$1" == "help" ] || [ "$1" == "-h1" ] || [ -z $1 ];
+then
+    printf "Usage: \n"
+    printf "    kubectl kubeplugin [Namespace] [Cluster] \n"
+    exit 0
+fi
 
-RESOURCE_TYPE=$0
+if [ -z $2 ];
+then
+    RESOURCE_TYPE=`kubectl config current-context`
+    OLD_RESOURCE_TYPE=0
+else
+    RESOURCE_TYPE=$2
+    OLD_RESOURCE_TYPE=`kubectl config current-context`
+    kubectl config set current-context ${RESOURCE_TYPE} >> /dev/null
+fi
+
+# Функція для виведення рядка таблиці
+print_row() {
+    printf "| %-20s | %-30s | %-40s | %-10s | %-10s |\n" "$1" "$2" "$3" "$4" "$5"
+}
+
+# Виведення заголовка таблиці
+printf "+----------------------+--------------------------------+------------------------------------------+------------+------------+\n"
+printf "| Resource             | Namespace                      | Name                                     | CPU        | Memory     |\n"
+printf "+----------------------+--------------------------------+------------------------------------------+------------+------------+\n"
 
 # Retrieve resource usage statistics from Kubernetes
-kubectl $2 $RESOURCE_TYPE -n $1 | tail -n +2 | while read line
+kubectl top pod -n $1 | tail -n +2 | while read line
 do
   # Extract CPU and memory usage from the output
   NAME=$(echo $line | awk '{print $1}')
@@ -14,4 +38,13 @@ do
 
   # Output the statistics to the console
   # "Resource, Namespace, Name, CPU, Memory"
+  print_row "${RESOURCE_TYPE}" "$1" "${NAME}" "${CPU}" "${MEMORY}"
 done
+
+# Завершення таблиці
+printf "+----------------------+--------------------------------+------------------------------------------+------------+------------+\n"
+
+if [ ${OLD_RESOURCE_TYPE} != 0 ];
+then
+    kubectl config set current-context ${OLD_RESOURCE_TYPE} >> /dev/null
+fi
